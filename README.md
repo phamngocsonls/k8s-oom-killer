@@ -4,6 +4,17 @@
 K8S OOM Killer delete the specified pod before it is OOMKilled. With Java Spring Boot, K8S OOM Killer using Actuator metrics to delete pod before it is out of heap memory  (java.lang.OutOfMemoryError: Java heap space)
 K8S OOM Killed is inspired from pre-oom-killer by syossan27
 ref: https://github.com/syossan27/pre-oom-killer
+
+## Why?
+While operating K8s service, OOMKilled event is a common issue when container memory usage reaches its limit.
+By setting resource.memory.limit to avoid containers consuming more memory than necessary or memory leaks,... but it will cause your application downtime.
+
+With ```k8s-oom-killer```, K8s pod will be deleted when container memory limit utilization reaches the threshold. Support Spring Boot heap memory via actuator metrics.
+## How it work?
+```k8s-oom-killer``` watches (once every ```60s``` by default) memory usage metrics for all pods matching label selector ```k8s-oom-killer=enabled``` Pods can specify a memory usage threshold by percent via an annotation ```k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold``` and container target to watches via annotation ```k8s-oom-killer.v1alpha1.k8s.io/target-container-name```. When ```k8s-oom-killer``` finds that the container memory usage has crossed the specified threshold, it starts trying to delete the pod.
+
+For Spring Boot application, ```k8s-oom-killer``` watch 2 metrics ```jvm.memory.max``` and ```jvm.memory.used``` using actuator metrics and delete when heap memory crossed the specified threshold
+
 ## Getting started
 Install with kustomize
 ```
