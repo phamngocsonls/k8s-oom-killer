@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: k8s-oom-killer
+  namespace: kube-system
+spec:
+  serviceAccountName: k8s-oom-killer
+  containers:
+  - name: k8s-oom-killer
+    image: phamngocsonls/k8s-oom-killer:0.12
+  restartPolicy: Always
