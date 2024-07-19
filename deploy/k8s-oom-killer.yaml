@@ -1,11 +1,20 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: k8s-oom-killer
   namespace: kube-system
 spec:
-  serviceAccountName: k8s-oom-killer
-  containers:
-  - name: k8s-oom-killer
-    image: phamngocsonls/k8s-oom-killer:0.12
-  restartPolicy: Always
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: k8s-oom-killer  
+  template:
+    metadata:
+      labels:
+        app: k8s-oom-killer
+    spec:
+      serviceAccountName: k8s-oom-killer
+      containers:
+      - name: k8s-oom-killer
+        image: phamngocsonls/k8s-oom-killer:0.13
+        restartPolicy: Always

@@ -4,8 +4,8 @@ import time
 import threading
 import os
 
-config.load_incluster_config() # for local environment
-#config.load_kube_config()
+config.load_incluster_config() 
+# config.load_kube_config() # for local environment
 
 v1 = client.CoreV1Api()
 metrics_api = client.CustomObjectsApi()
@@ -17,6 +17,7 @@ min_container_free_mem = 30
 min_heap_free_mem = 30
 dryRun = False
 interval = 60
+max_pod_rep_delete_batch = 1
 
 if 'grace_period_seconds' in os.environ:
     grace_period_seconds = int(os.environ['grace_period_seconds'])
@@ -29,6 +30,8 @@ if 'interval' in os.environ:
 if 'dryRun' in os.environ:
     if os.environ['dryRun'] == "True":
         dryRun = True
+if 'max_pod_rep_delete_batch' in os.environ:
+    max_pod_rep_delete_batch = int(os.environ['max_pod_rep_delete_batch'])
 
 def delete_pod(api_client, pod_name, namespace, grace_period_seconds=300):
     try:
@@ -73,14 +76,15 @@ def get_heap_meminfo(pod_ip,service_port):
 def oom_killer():
     pod_data = {}
     all_namespace = []
+    deleted_pod_dict = {}
     try:
         pod_list = v1.list_pod_for_all_namespaces(watch=False)
     except client.ApiException as e:
         print("Error getting pods:", e)
         exit(1)
-
     # Convert V1PodList object to JSON string
     json_data = pod_list.to_dict()
+    
     for i in json_data['items']:
         if i['metadata']['labels'] == None:
             continue
@@ -123,24 +127,43 @@ def oom_killer():
                                     pod_data[pod['metadata']['name']]['container_data'][c_metrics['name']]['memory_utilz'] = memory_utilz
 
     for i in pod_data:
-        #print(i,pod_data[i])
+        is_delete = False
+        delete_type = ""
         if "k8s-oom-killer.v1alpha1.k8s.io/memory-heap-usage-threshold" in pod_data[i]['annotations'] and "k8s-oom-killer.v1alpha1.k8s.io/target-actuator-port" in pod_data[i]['annotations']:
             #kill heap
             heap_free, heap_usage_utilz = get_heap_meminfo(pod_data[i]["pod_ip"],pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/target-actuator-port"])
             if heap_free == None and heap_usage_utilz == None:
                 continue
             if heap_free < min_heap_free_mem or heap_usage_utilz > float(pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/memory-heap-usage-threshold"]):
-                print(f'Heap: Deleted pod {i}, namespace: {pod_data[i]["namespace"]}')
+                delete_type = "heap"
                 if dryRun == False:
-                    delete_pod(v1, i, pod_data[i]['namespace'],grace_period_seconds)
-                continue
+                    is_delete = True
 
-        if "k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold" in pod_data[i]['annotations'] and "k8s-oom-killer.v1alpha1.k8s.io/target-container-name" in pod_data[i]['annotations']:
-            if pod_data[i]["container_data"][pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/target-container-name"]]['memory_free'] < min_container_free_mem or pod_data[i]["container_data"][pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/target-container-name"]]['memory_utilz'] > float(pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold"]):
-                print(f'Container: Deleted pod {i}, namespace: {pod_data[i]["namespace"]}')
-                if dryRun == False:
-                    delete_pod(v1, i, pod_data[i]['namespace'],grace_period_seconds)
+        if is_delete == False:
+            if "k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold" in pod_data[i]['annotations'] and "k8s-oom-killer.v1alpha1.k8s.io/target-container-name" in pod_data[i]['annotations']:
+                if pod_data[i]["container_data"][pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/target-container-name"]]['memory_free'] < min_container_free_mem or pod_data[i]["container_data"][pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/target-container-name"]]['memory_utilz'] > float(pod_data[i]['annotations']["k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold"]):
+                    delete_type = "mem_limit"
+                    if dryRun == False:
+                        is_delete = True
 
+        if True:
+            pod_name = i
+            if pod_name.find("-") > 1:
+                parts = pod_name.split("-")
+                replicaset_name = pod_name[:-(1+len(parts[-1]))]
+                if replicaset_name not in deleted_pod_dict:
+                    deleted_pod_dict[replicaset_name] = [pod_name]
+                else:
+                    deleted_pod_dict[replicaset_name].append(pod_name)
+                    
+            if len(deleted_pod_dict[replicaset_name]) <= max_pod_rep_delete_batch:    #check maxium pod delete per replicaset at one time
+                if delete_type == "heap":
+                    print(f'Heap: Deleted pod {i}, namespace: {pod_data[i]["namespace"]}')
+                elif delete_type == "mem_limit":
+                    print(f'Container: Deleted pod {i}, namespace: {pod_data[i]["namespace"]}')
+                delete_pod(v1, i, pod_data[i]['namespace'],grace_period_seconds)
+
+                        
 if __name__ == "__main__":
     print("Hello, checking job...")
     while True:

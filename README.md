@@ -72,5 +72,6 @@ grace_period_seconds = 300   #k8s delete grace period seconds
 min_container_free_mem = 30  #if free memory below 30M -> Container will be deleted
 min_heap_free_mem = 30       #if free heap memory below 30M -> Container will be deleted
 dryRun = False               #Change to True for dry run
-interval = 60                
+interval = 60
+max_pod_rep_delete_batch = 1 #prevent tool delete all pod in replicaset at one time                
 ```
