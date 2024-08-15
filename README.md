@@ -36,7 +36,7 @@ spec:
         k8s-oom-killer: enabled
       annotations:
         k8s-oom-killer.v1alpha1.k8s.io/target-container-name: "nginx"
-        k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold: "80"
+        k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold: "95"
 ```
 
 - Deployment for Spring Boot (Enable [spring-boot-actuator](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html?query=health%27%20target=_blank%3E%3Cb%3Ehealth%3C/b%3E%3C/a%3E-groups#actuator.enabling))
@@ -51,8 +51,8 @@ spec:
         k8s-oom-killer: enabled
       annotations:
         k8s-oom-killer.v1alpha1.k8s.io/target-container-name: "spring-boot"
-        k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold: "70"
-        k8s-oom-killer.v1alpha1.k8s.io/memory-heap-usage-threshold: "80"
+        k8s-oom-killer.v1alpha1.k8s.io/memory-usage-threshold: "95"
+        k8s-oom-killer.v1alpha1.k8s.io/memory-heap-usage-threshold: "90"
         k8s-oom-killer.v1alpha1.k8s.io/target-actuator-port: "8080"
 ```
 
