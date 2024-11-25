@@ -17,4 +17,3 @@ spec:
       containers:
       - name: k8s-oom-killer
         image: phamngocsonls/k8s-oom-killer:0.13
-        restartPolicy: Always
