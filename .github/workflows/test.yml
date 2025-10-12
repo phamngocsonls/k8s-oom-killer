@@ -80,3 +80,19 @@ jobs:
             -Dsonar.projectKey=my-project
             -Dsonar.sources=.
             -Dsonar.sourceEncoding=UTF-8
+
+      - name: Show Analysis Results
+        run: |
+          echo "📊 SonarQube Analysis Complete!"
+          echo "================================"
+          echo "✅ Analysis successful"
+          echo "🔗 Dashboard: http://localhost:9000/dashboard?id=my-project"
+          echo ""
+          echo "⏳ Waiting for server processing..."
+          sleep 30
+
+          echo "📈 Quick Summary:"
+          curl -s "http://localhost:9000/api/qualitygates/project_status?projectKey=my-project" | jq -r '"Quality Gate: " + .projectStatus.status'
+          curl -s "http://localhost:9000/api/issues/search?componentKeys=my-project&resolved=false" | jq -r '"Total Issues: " + (.total | tostring)'
+          curl -s "http://localhost:9000/api/measures/component?component=my-project&metricKeys=coverage" | jq -r '"Coverage: " + (.component.measures[]?.value // "N/A") + "%"'
+          echo "================================"
