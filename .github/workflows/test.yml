@@ -44,7 +44,7 @@ jobs:
         run: |
           echo "⏳ Waiting for SonarQube to start..."
           for i in {1..40}; do
-            STATUS=$(curl -s http://sonarqube:9000/api/system/status | jq -r .status || true)
+            STATUS=$(curl -s http://localhost:9000/api/system/status | jq -r .status || true)
             if [ "$STATUS" = "UP" ]; then
               echo "✅ SonarQube is UP!"
               break
@@ -56,7 +56,7 @@ jobs:
       - name: Generate SonarQube admin token
         run: |
           echo "🔑 Creating admin token..."
-          curl -s -u admin:admin -X POST "http://sonarqube:9000/api/user_tokens/generate?name=ci_token" > token.json
+          curl -s -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate?name=ci_token" > token.json
           export SONAR_TOKEN=$(jq -r .token token.json)
           if [ "$SONAR_TOKEN" = "null" ]; then
             echo "Failed to generate token!"
