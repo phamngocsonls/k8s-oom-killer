@@ -81,7 +81,7 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.sourceEncoding=UTF-8
 
-      - name: Show Analysis Results
+      - name: Show Analysis Results (Alternative)
         run: |
           echo "📊 SonarQube Analysis Complete!"
           echo "================================"
@@ -89,10 +89,26 @@ jobs:
           echo "🔗 Dashboard: http://sonarqube:9000/dashboard?id=my-project"
           echo ""
           echo "⏳ Waiting for server processing..."
-          sleep 30
-
+          sleep 10
+      
           echo "📈 Quick Summary:"
-          curl -s "http://sonarqube:9000/api/qualitygates/project_status?projectKey=my-project" | jq -r '"Quality Gate: " + .projectStatus.status'
-          curl -s "http://sonarqube:9000/api/issues/search?componentKeys=my-project&resolved=false" | jq -r '"Total Issues: " + (.total | tostring)'
-          curl -s "http://sonarqube:9000/api/measures/component?component=my-project&metricKeys=coverage" | jq -r '"Coverage: " + (.component.measures[]?.value // "N/A") + "%"'
+          
+          # Try different project identifiers
+          for PROJECT_ID in "my-project" "my_project" "myproject"; do
+            echo "Trying project key: $PROJECT_ID"
+            
+            QG_STATUS=$(curl -s "http://sonarqube:9000/api/qualitygates/project_status?projectKey=$PROJECT_ID" | jq -r '.projectStatus.status // "NOT_FOUND"')
+            if [ "$QG_STATUS" != "NOT_FOUND" ]; then
+              echo "✅ Found project with key: $PROJECT_ID"
+              echo "Quality Gate: $QG_STATUS"
+              
+              ISSUES_COUNT=$(curl -s "http://sonarqube:9000/api/issues/search?componentKeys=$PROJECT_ID&resolved=false" | jq -r '.total // "N/A"')
+              echo "Total Issues: $ISSUES_COUNT"
+              
+              COVERAGE=$(curl -s "http://sonarqube:9000/api/measures/component?component=$PROJECT_ID&metricKeys=coverage" | jq -r '.component.measures[]?.value // "N/A"')
+              echo "Coverage: ${COVERAGE}%"
+              break
+            fi
+          done
+          
           echo "================================"
