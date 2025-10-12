@@ -1,0 +1,71 @@
+name: SonarQube Scan (Ephemeral)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: sonar
+          POSTGRES_PASSWORD: sonarpass
+          POSTGRES_DB: sonarqube
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sonar"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+      sonarqube:
+        image: sonarqube:community
+        env:
+          SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
+          SONAR_JDBC_USERNAME: sonar
+          SONAR_JDBC_PASSWORD: sonarpass
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd="curl -f http://localhost:9000/api/system/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for SonarQube to be ready
+        run: |
+          echo "Waiting for SonarQube to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:9000/api/system/status | grep -q '"status":"UP"'; then
+              echo "SonarQube is UP!"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Generate Sonar token
+        run: |
+          echo "Creating admin token..."
+          curl -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate?name=ci_token" > token.json
+          export SONAR_TOKEN=$(jq -r .token token.json)
+          echo "SONAR_TOKEN=$SONAR_TOKEN" >> $GITHUB_ENV
+
+      - name: Run SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_HOST_URL: http://localhost:9000
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=my-project
+            -Dsonar.sources=.
