@@ -32,20 +32,19 @@ jobs:
           SONAR_JDBC_PASSWORD: sonarpass
         ports:
           - 9000:9000
-        # no health check (SonarQube startup takes >60s)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JQ and Curl
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y jq curl
 
       - name: Wait for SonarQube to be ready
         run: |
           echo "⏳ Waiting for SonarQube to start..."
           for i in {1..40}; do
-            STATUS=$(curl -s http://localhost:9000/api/system/status | jq -r .status || true)
+            STATUS=$(curl -s http://sonarqube:9000/api/system/status | jq -r .status || true)
             if [ "$STATUS" = "UP" ]; then
               echo "✅ SonarQube is UP!"
               break
@@ -57,7 +56,7 @@ jobs:
       - name: Generate SonarQube admin token
         run: |
           echo "🔑 Creating admin token..."
-          curl -s -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate?name=ci_token" > token.json
+          curl -s -u admin:admin -X POST "http://sonarqube:9000/api/user_tokens/generate?name=ci_token" > token.json
           export SONAR_TOKEN=$(jq -r .token token.json)
           if [ "$SONAR_TOKEN" = "null" ]; then
             echo "Failed to generate token!"
@@ -74,16 +73,10 @@ jobs:
       - name: Run SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v2
         env:
-          SONAR_HOST_URL: http://localhost:9000
+          SONAR_HOST_URL: http://sonarqube:9000   # 👈 FIXED: use container hostname
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=my-project
             -Dsonar.sources=.
             -Dsonar.sourceEncoding=UTF-8
-
-      - name: Clean up (optional)
-        if: always()
-        run: |
-          echo "🧹 Cleaning up SonarQube containers..."
-          docker ps -a
